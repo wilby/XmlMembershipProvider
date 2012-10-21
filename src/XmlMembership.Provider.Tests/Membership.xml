@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<XmlProvider>
+  <Users>
+    <User>
+      <ApplicationId>/</ApplicationId>
+      <UserName></UserName>
+      <PasswordSalt></PasswordSalt>
+      <Password></Password>
+      <Email></Email>
+      <PasswordQuestion></PasswordQuestion>
+      <PasswordAnswer></PasswordAnswer>
+      <IsApproved></IsApproved>
+      <IsLockedOut></IsLockedOut>
+      <CreateDate></CreateDate>
+      <LastLoginDate></LastLoginDate>
+      <LastActivityDate></LastActivityDate>
+      <LastPasswordChangeDate></LastPasswordChangeDate>
+      <LastLockoutDate></LastLockoutDate>
+      <FailedPasswordAttemptCount></FailedPasswordAttemptCount>
+      <FailedPasswordAnswerAttemptCount></FailedPasswordAnswerAttemptCount>
+      <Comment></Comment>
+    </User>
+  </Users>
+  <Roles>
+    <Role>
+      <ApplicationId>/</ApplicationId>
+      <RoleName></RoleName>
+      <Description></Description>
+    </Role>
+  </Roles>
+  <UserRoles>
+    <UserName></UserName>
+    <RoleName></RoleName>
+  </UserRoles>
+</XmlProvider>
