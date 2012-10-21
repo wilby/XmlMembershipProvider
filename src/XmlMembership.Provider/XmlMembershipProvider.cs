@@ -439,21 +439,19 @@ namespace Membership.Provider
         }
 
         /// <summary>
-        /// Retrieves a username based on a matching email.
+        /// Retrieves the first username based on a matching email.
         /// </summary>
         public override string GetUserNameByEmail(string email)
         {
-            XmlDocument doc = new XmlDocument();
-            doc.Load(_XmlFileName);
+            InitializeDataStore();
 
-            foreach (XmlNode node in doc.GetElementsByTagName("User"))
-            {
-                if (node.ChildNodes[2].InnerText.Equals(email.Trim(), StringComparison.OrdinalIgnoreCase))
-                {
-                    return node.ChildNodes[0].InnerText;
-                }
-            }
-            return null;
+            var xUser = _Document.Descendants("User").Where(x => x.Element("Email").Value == email.ToLower()).FirstOrDefault();
+
+            if (xUser == null)
+                return string.Empty;
+
+            string username = xUser.Element("UserName").Value;
+            return username;
         }
 
 

@@ -273,6 +273,14 @@ namespace Membership.Provider.Tests
 
         }
 
+        [TestMethod]
+        public void GetUserNameByEmail()
+        {
+            string username = _provider.GetUserNameByEmail(FakesData.GoodEmail());
+
+            Assert.AreEqual(FakesData.GoodUserName(), username);
+        }
+
 
         //Helper Methods
 
