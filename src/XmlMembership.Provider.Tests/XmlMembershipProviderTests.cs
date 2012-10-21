@@ -204,13 +204,75 @@ namespace Membership.Provider.Tests
         [TestMethod]
         public void GetAllUsers()
         {
-            AddTestUser();
+            var xUser = GetGoodUser();
+            if(_provider.XDocument.Descendants("User").Count() == 0)
+                _provider.XDocument.Descendants("Users").FirstOrDefault().Add(xUser);
 
             int total  = 0;
             var users = _provider.GetAllUsers(0, 4, out total);
 
             Assert.AreEqual(1, total);            
         }
+
+        [TestMethod]
+        public void GetNumberOfUsersOnline()
+        {
+            var userOnline = _provider.GetNumberOfUsersOnline();
+
+            Assert.AreEqual(1, userOnline);
+        }
+
+        [TestMethod]
+        public void ResetPassword()
+        {
+            var newPassword = _provider.ResetPassword(FakesData.GoodUserName(), FakesData.GoodPasswordQuestionAnswer());
+
+            var xUser = XDocument.Load(_xmlFileName).Descendants("User").Where(x => x.Element("UserName").Value == FakesData.GoodUserName()).FirstOrDefault();
+
+            Assert.AreEqual(xUser.Element("Password").Value, PasswordUtil.HashPassword(newPassword, xUser.Element("PasswordSalt").Value, _hashAlgorithm, _validationKey));
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(NotSupportedException))]
+        public void ResetPassword_thows_not_supported_when_enablePasswordReset_is_false()
+        {
+            _provider = new XmlMembershipProvider();
+            _provider.XmlFileName = "Membership.xml";
+            _provider.XDocument = _Document;
+            var config = CreateConfigFake();
+            config.Remove("enablePasswordReset");
+            config.Add("enablePasswordReset", "false");
+            _provider.Initialize("XmlMembershipProvider", config);
+            var newPassword = _provider.ResetPassword(FakesData.GoodUserName(), FakesData.GoodPasswordQuestionAnswer());
+
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(NullReferenceException))]
+        public void ResetPassword_thows_NullReference_when_user_does_not_exist()
+        {   
+            //Reset Config from last test
+            Initialize(null);
+
+            var newPassword = _provider.ResetPassword(FakesData.BadUserName(), FakesData.GoodPasswordQuestionAnswer());
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(MembershipPasswordException))]
+        public void ResetPassword_thows_membershippassword_when_passwordquestionanser_is_wrong()
+        {
+            
+            var newPassword = _provider.ResetPassword(FakesData.GoodUserName(), "");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(MembershipPasswordException))]
+        public void GetPassword_thows_MembershipPasswordException_when_trying_to_retrieve_hashed_Passwords()
+        {            
+            var newPassword = _provider.GetPassword(FakesData.GoodUserName(), FakesData.GoodPasswordQuestionAnswer());
+
+        }
+
 
         //Helper Methods
 

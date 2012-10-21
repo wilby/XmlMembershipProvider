@@ -60,7 +60,7 @@ namespace Membership.Provider
 
         public override bool EnablePasswordReset
         {
-            get { return false; }
+            get { return _enablePasswordReset; }
         }
 
         public override int MaxInvalidPasswordAttempts
@@ -90,7 +90,7 @@ namespace Membership.Provider
 
         public override bool RequiresQuestionAndAnswer
         {
-            get { return false; }
+            get { return _requiresQuestionAndAnswer; }
         }
 
         public override bool RequiresUniqueEmail
@@ -523,6 +523,92 @@ namespace Membership.Provider
             _Document.Save(_XmlFileName);
         }
 
+        /// <summary>
+        /// Returns the number of users online. 
+        /// These are users who's last activity date is greater than the current time minus Memberships UserIsOnlineTimeWindow property. 
+        /// </summary>
+        /// <returns></returns>
+        public override int GetNumberOfUsersOnline()
+        {
+            var now = DateTime.Now;
+            int timewindow = System.Web.Security.Membership.UserIsOnlineTimeWindow;
+
+            var onlineTime = now.Subtract(new TimeSpan(0, timewindow, 0));
+
+            InitializeDataStore();
+            var nbrUsersOnline = _Document.Descendants("User").Where(x => Convert.ToDateTime(x.Element("LastActivityDate").Value) > onlineTime).Count();
+            return nbrUsersOnline;
+        }
+
+        /// <summary>
+        /// Takes, as input, a user name and a password answer and generates a new, random password for the specified user. 
+        /// The ResetPassword method updates the user information in the data source with the new password value and returns the new password as a string
+        /// </summary>
+        /// <param name="username"></param>
+        /// <param name="answer"></param>
+        /// <returns></returns>
+        public override string ResetPassword(string username, string answer)
+        {
+            if (!EnablePasswordReset)
+                throw new NotSupportedException("EnablePasswordReset is false.");
+
+            InitializeDataStore();
+            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+
+            if (xUser == null)
+                throw new NullReferenceException(string.Format("The user {0} does not exists", username));
+            
+            if (RequiresQuestionAndAnswer)
+            {
+                var dsAnswer = xUser.Element("PasswordAnswer").Value;
+
+                if (answer.Trim() != dsAnswer)
+                    throw new MembershipPasswordException("The answer is incorrect.");
+            }
+
+            var newSalt = PasswordUtil.CreateRandomSalt();
+            var newPassword = System.Web.Security.Membership.GeneratePassword(MinRequiredPasswordLength, MinRequiredNonAlphanumericCharacters);
+            var encodedNewPassword = EncodePassword(newPassword, newSalt);
+
+            xUser.Element("Password").Value = encodedNewPassword;
+            xUser.Element("PasswordSalt").Value = newSalt;
+
+            _Document.Save(XmlFileName);
+
+            return newPassword;
+        }
+
+        public override string GetPassword(string username, string answer)
+        {
+            if (PasswordFormat == MembershipPasswordFormat.Hashed)
+                throw new MembershipPasswordException("Hashed passwords cannot be retrieved.");
+
+            if (!EnablePasswordRetrieval)
+                throw new ProviderException("EnablePasswordRetrieval is false.");
+
+            InitializeDataStore();
+            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+
+            if (xUser == null)
+                throw new NullReferenceException(string.Format("The user {0} does not exists", username));
+
+            if (RequiresQuestionAndAnswer)
+            {
+                var dsAnswer = xUser.Element("PasswordAnswer").Value;
+
+                if (answer.Trim() != dsAnswer)
+                    throw new MembershipPasswordException("The answer is incorrect.");
+            }
+
+            var encodedPassword = xUser.Element("Password").Value;
+            
+            if (PasswordFormat == MembershipPasswordFormat.Clear)
+                return encodedPassword;
+
+            var salt = xUser.Element("PasswordSalt").Value;
+            return UnEncodePassword(encodedPassword, salt);
+        }
+
         #endregion
 
         #region Helper methods
@@ -613,9 +699,11 @@ namespace Membership.Provider
                     _passwordFormat = MembershipPasswordFormat.Hashed;
                     break;
                 case "Encrypted":
-                    throw new ProviderException("Encrypted passwords are not secure, please use a hashing algorithm.");                    
+                    _passwordFormat = MembershipPasswordFormat.Encrypted;
+                    break;
                 case "Clear":
-                    throw new ProviderException("Clear passwords are not secure, please use a hashing algorithm.");                                        
+                    _passwordFormat = MembershipPasswordFormat.Clear;
+                    break;
                 default:
                     throw new ProviderException("The password format from the custom provider is not supported.");
             }
@@ -689,14 +777,10 @@ namespace Membership.Provider
             }
         }
 
+
         #endregion
 
         #region Unsupported methods
-
-        public override string ResetPassword(string username, string answer)
-        {
-            throw new NotSupportedException();
-        }
 
         public override bool UnlockUser(string userName)
         {
@@ -713,17 +797,7 @@ namespace Membership.Provider
             throw new NotSupportedException();
         }
 
-        public override int GetNumberOfUsersOnline()
-        {
-            throw new NotSupportedException();
-        }
-
         public override bool ChangePasswordQuestionAndAnswer(string username, string password, string newPasswordQuestion, string newPasswordAnswer)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override string GetPassword(string username, string answer)
         {
             throw new NotSupportedException();
         }
