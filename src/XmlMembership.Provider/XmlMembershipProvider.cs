@@ -318,22 +318,32 @@ namespace Membership.Provider
         }
 
         /// <summary>
-        /// Changes a users password.
+        /// Takes, as input, a user name, a current password, and a new password, and updates the password in the data source if the supplied user name and current password are valid. 
+        /// The ChangePassword method returns true if the password was updated successfully; otherwise, false.
         /// </summary>
         public override bool ChangePassword(string username, string oldPassword, string newPassword)
         {
-            XmlDocument doc = new XmlDocument();
-            doc.Load(_XmlFileName);
-            XmlNodeList nodes = doc.GetElementsByTagName("User");
-            foreach (XmlNode node in nodes)
+            InitializeDataStore();
+
+            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+
+            if (xUser == null)
+                return false;
+
+            string salt = xUser.Element("PasswordSalt").Value;
+            string oldPassEncoded = EncodePassword(oldPassword, salt);
+            string dsOldPassEncoded = xUser.Element("Password").Value;
+
+            if (oldPassEncoded != dsOldPassEncoded)
+                return false;
+
+            var passMeetsReqs = PasswordMeetsMinimumRequirements(newPassword);
+            if (passMeetsReqs)
             {
-                if (node["UserName"].InnerText.Equals(username, StringComparison.OrdinalIgnoreCase)
-                  || node["Password"].InnerText.Equals(Encrypt(oldPassword), StringComparison.OrdinalIgnoreCase))
-                {
-                    node["Password"].InnerText = Encrypt(newPassword);
-                    doc.Save(_XmlFileName);
-                    return true;
-                }
+                string newPasswordEncoded = EncodePassword(newPassword, salt);
+                xUser.Element("Password").Value = newPasswordEncoded;
+                _Document.Save(XmlFileName);
+                return true;
             }
 
             return false;
@@ -373,8 +383,7 @@ namespace Membership.Provider
                 return null;
             }
 
-            var nonAlphaNumericCharacters = password.Where(c => !char.IsLetterOrDigit(c)).SelectMany(x => x.ToString());
-            if (password.Length < MinRequiredPasswordLength || nonAlphaNumericCharacters.Count() < MinRequiredNonAlphanumericCharacters)
+            if(!PasswordMeetsMinimumRequirements(password))
             {
                 status = MembershipCreateStatus.InvalidPassword;                
                 return null;
@@ -502,8 +511,17 @@ namespace Membership.Provider
             if (xuser == null)
                 throw new NullReferenceException(string.Format("Cannot update user {0}. They don't exist in the data store.", user.UserName));
 
+            
             if (!string.IsNullOrEmpty(password))
-                xuser.Element("Password").Value = PasswordUtil.HashPassword(password, xuser.Element("PasswordSalt").Value, _hashAlgorithm, _validationKey);
+            {
+                var passMeetsReqs = PasswordMeetsMinimumRequirements(password);
+                if (!passMeetsReqs)
+                    throw new MembershipPasswordException("The password does not meet the minimum requirements.");
+                var salt = xuser.Element("PasswordSalt").Value;
+                xuser.Element("Password").Value = EncodePassword(password, salt);
+                
+            }
+            
 
             xuser.Element("Email").Value = user.Email;
             xuser.Element("PasswordQuestion").Value = user.PasswordQuestion;
@@ -773,6 +791,16 @@ namespace Membership.Provider
                 byte[] encryptedBytes = sha.TransformFinalBlock(data, 0, data.Length);
                 return Convert.ToBase64String(sha.Hash);
             }
+        }
+
+        private bool PasswordMeetsMinimumRequirements(string password)
+        {
+            var nonAlphaNumericCharacters = password.Where(c => !char.IsLetterOrDigit(c)).SelectMany(x => x.ToString());
+            if (password.Length < MinRequiredPasswordLength || nonAlphaNumericCharacters.Count() < MinRequiredNonAlphanumericCharacters)
+            {
+                return false;
+            }
+            return true;
         }
 
 

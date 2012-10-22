@@ -8,6 +8,7 @@ using System.Collections.Specialized;
 using System.Web.Configuration;
 using System.Text;
 using System.Web.Security;
+using System.IO;
 
 namespace Membership.Provider.Tests
 {
@@ -30,13 +31,34 @@ namespace Membership.Provider.Tests
             _validationKey = machineKey.ValidationKey;
         }
 
-        [ClassInitialize]
-        public static void Initialize(TestContext context)
+        [TestInitialize]
+        public void Initialize()
         {            
             AddTestUser();
 
             _provider = new XmlMembershipProvider();
-            _provider.XmlFileName = "Membership.xml";
+            _provider.XmlFileName = _xmlFileName;
+            if (File.Exists(_xmlFileName))
+                File.Delete(_xmlFileName);
+
+            File.AppendAllText(_xmlFileName, @"<XmlProvider>
+  <Users>    
+  </Users>
+  <Roles>
+    <Role>
+      <ApplicationId>/</ApplicationId>
+      <RoleName></RoleName>
+      <Description></Description>
+    </Role>
+  </Roles>
+  <UserRoles>
+    <UserName></UserName>
+    <RoleName></RoleName>
+  </UserRoles>
+</XmlProvider>
+");
+            _Document = XDocument.Load(_xmlFileName);
+            AddTestUser();
             _provider.XDocument = _Document;
             _provider.Initialize("XmlMembershipProvider", CreateConfigFake());            
         }
@@ -44,8 +66,8 @@ namespace Membership.Provider.Tests
         [ClassCleanup]
         public static void Teardown()
         {
-            _Document.Descendants("User").Remove();
-            _Document.Save(_xmlFileName);
+            //_Document.Descendants("User").Remove();
+            //_Document.Save(_xmlFileName);
         }
 
         [TestMethod]
@@ -251,10 +273,8 @@ namespace Membership.Provider.Tests
         [ExpectedException(typeof(NullReferenceException))]
         public void ResetPassword_thows_NullReference_when_user_does_not_exist()
         {   
-            //Reset Config from last test
-            Initialize(null);
-
             var newPassword = _provider.ResetPassword(FakesData.BadUserName(), FakesData.GoodPasswordQuestionAnswer());
+
         }
 
         [TestMethod]
@@ -281,6 +301,29 @@ namespace Membership.Provider.Tests
             Assert.AreEqual(FakesData.GoodUserName(), username);
         }
 
+        [TestMethod]
+        public void ChangePassword_returns_false_when_user_does_not_exist()
+        {
+            var changed = _provider.ChangePassword(FakesData.BadUserName(), FakesData.GoodPassword(), FakesData.GoodPassword());
+
+            Assert.AreEqual(false, changed);
+        }
+
+        [TestMethod]
+        public void ChangePassword_returns_false_when_old_pass_is_wrong()
+        {
+            var changed = _provider.ChangePassword(FakesData.GoodUserName(), "", FakesData.GoodPassword());
+
+            Assert.AreEqual(false, changed);
+        }
+
+        [TestMethod]
+        public void ChangePassword_returns_true_when_username_and_old_pass_are_correct()
+        {   
+            var changed = _provider.ChangePassword(FakesData.GoodUserName(), FakesData.GoodPassword(), FakesData.GoodPassword());
+
+            Assert.AreEqual(true, changed);
+        }
 
         //Helper Methods
 
