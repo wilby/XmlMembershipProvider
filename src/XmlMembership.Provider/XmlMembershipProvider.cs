@@ -21,8 +21,7 @@ namespace Membership.Provider
 {
 
     public class XmlMembershipProvider : MembershipProvider
-    {
-        private Dictionary<string, MembershipUser> _Users;
+    {   
         private string _XmlFileName;
         private XDocument _Document;
         private string _hashAlgorithm;
@@ -42,6 +41,9 @@ namespace Membership.Provider
 
         public string ProviderName { get; set; }
 
+        /// <summary>
+        /// Used in testing for access to the private _Document variable when compile in debug mode.
+        /// </summary>
         #if DEBUG
         public XDocument XDocument { get { return _Document; } set { _Document = value; } }        
         #endif
@@ -55,7 +57,7 @@ namespace Membership.Provider
 
         public override bool EnablePasswordRetrieval
         {
-            get { return false; }
+            get { return _enablePasswordRetrieval; }
         }
 
         public override bool EnablePasswordReset
@@ -65,7 +67,7 @@ namespace Membership.Provider
 
         public override int MaxInvalidPasswordAttempts
         {
-            get { return 5; }
+            get { return MaxInvalidPasswordAttempts; }
         }
 
         public override int MinRequiredNonAlphanumericCharacters
@@ -75,17 +77,17 @@ namespace Membership.Provider
 
         public override int MinRequiredPasswordLength
         {
-            get { return 8; }
+            get { return _minRequiredPasswordLength; }
         }
 
         public override int PasswordAttemptWindow
         {
-            get { throw new NotSupportedException(); }
+            get { return _passwordAttemptWindow; }
         }
 
         public override string PasswordStrengthRegularExpression
         {
-            get { throw new NotSupportedException(); }
+            get { return _passwordStrengthRegularExpression; }
         }
 
         public override bool RequiresQuestionAndAnswer
@@ -95,7 +97,7 @@ namespace Membership.Provider
 
         public override bool RequiresUniqueEmail
         {
-            get { return false; }
+            get { return _requiresUniqueEmail; }
         }
 
         #endregion
@@ -103,32 +105,11 @@ namespace Membership.Provider
         #region Supported methods
 
         public override void Initialize(string name, NameValueCollection config)
-        {
-            if (config == null)
-                throw new ArgumentNullException("config");
-
-            if (String.IsNullOrEmpty(name))
-                name = "XmlMembershipProvider";
-
-            this.ProviderName = name;
-
-            if (string.IsNullOrEmpty(config["description"]))
-            {
-                config.Remove("description");
-                config.Add("description", "XML membership provider");
-            }
-
-            if (string.IsNullOrEmpty(config["applicationName"]))
-                ApplicationName = "/";
-
-            InitConfigSettings(config);
+        {           
+            InitConfigSettings(name, ref config);
             InitPasswordEncryptionSettings(config);
-
             base.Initialize(name, config);
 
-
-            // Initialize _XmlFileName and make sure the path
-            // is app-relative
             string path = config["xmlFileName"];
 
             if (string.IsNullOrEmpty(XmlFileName))
@@ -161,29 +142,11 @@ namespace Membership.Provider
             config.Remove("xmlFileName");
 
 
-            if (!File.Exists(_XmlFileName))
+            if (!File.Exists(XmlFileName))
             {
-                File.AppendAllText(_XmlFileName, @"<XmlProvider>
-  <Users>
-    <User>
-      <ApplicationId>MyApp</ApplicationId>
-      <UserName>wilby</UserName>
-      <PasswordSalt>KfONZg==</PasswordSalt>
-      <Password>D4j8sWgqK0XpiPB4Szs0Cl41530=</Password>
-      <Email>wilby@wcjj.net</Email>
-      <PasswordQuestion>Mother's Maiden Name</PasswordQuestion>
-      <PasswordAnswer>Smith</PasswordAnswer>
-      <IsApproved>True</IsApproved>
-      <IsLockedOut>False</IsLockedOut>
-      <CreateDate>10/20/2012 9:16:03 AM</CreateDate>
-      <LastLoginDate>10/20/2012 9:16:03 AM</LastLoginDate>
-      <LastActivityDate>10/20/2012 9:16:03 AM</LastActivityDate>
-      <LastPasswordChangeDate>10/20/2012 9:16:03 AM</LastPasswordChangeDate>
-      <LastLockoutDate>10/20/2012 9:16:03 AM</LastLockoutDate>
-      <FailedPasswordAttemptCount>0</FailedPasswordAttemptCount>
-      <FailedPasswordAnswerAttemptCount>0</FailedPasswordAnswerAttemptCount>
-      <Comment></Comment>
-    </User>
+                File.AppendAllText(XmlFileName, @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""no"" ?>
+<XmlProvider>
+  <Users>    
   </Users>
   <Roles>
     <Role>
@@ -199,18 +162,6 @@ namespace Membership.Provider
 </XmlProvider>
 ");
             }
-
-
-            // Throw an exception if unrecognized attributes remain
-            //if (config.Count > 0)
-            //{
-            //    string attr = config.GetKey(0);
-            //    if (!String.IsNullOrEmpty(attr))
-            //        throw new ProviderException("Unrecognized attribute: " + attr);
-            //}
-
-            if(_Document == null) 
-                _Document = XDocument.Load(_XmlFileName);
         }
 
         /// <summary>
@@ -223,10 +174,8 @@ namespace Membership.Provider
 
             try
             {
-                InitializeDataStore();
-
                 // Validate the user name and password            
-                XElement xUser = _Document.Descendants("User").Where(z => z.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+                XElement xUser = GetXlementUser(username);
 
                 if (xUser == null)
                     return false;
@@ -264,10 +213,8 @@ namespace Membership.Provider
             if (String.IsNullOrEmpty(username))
                 return null;
 
-            InitializeDataStore();
-
             MembershipUser user;
-            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+            var xUser = GetXlementUser(username);
 
             if (xUser != null)
             {
@@ -303,8 +250,6 @@ namespace Membership.Provider
         {
             InitializeDataStore();
 
-            int startIndex = pageIndex * pageSize;
-
             MembershipUserCollection users = new MembershipUserCollection();
             var xUsers = _Document.Descendants("User").Skip(pageIndex).Take(pageSize);
             foreach (XElement xuser in xUsers)
@@ -322,11 +267,9 @@ namespace Membership.Provider
         /// The ChangePassword method returns true if the password was updated successfully; otherwise, false.
         /// </summary>
         public override bool ChangePassword(string username, string oldPassword, string newPassword)
-        {
-            InitializeDataStore();
-
-            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
-
+        {            
+            var xUser = GetXlementUser(username);
+            
             if (xUser == null)
                 return false;
 
@@ -365,19 +308,17 @@ namespace Membership.Provider
                 throw new MembershipPasswordException("There was a problem with the given password", ex);
             }
 
-            InitializeDataStore();            
-
             XElement xUser;
 
-            xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+            xUser = GetXlementUser(username);
             if (xUser != null)
             {
                 status = MembershipCreateStatus.DuplicateUserName;
                 return null;
             }
 
-            xUser = _Document.Descendants("User").Where(x => x.Element("Email").Value == email.ToLower()).FirstOrDefault();
-            if (xUser != null)
+            xUser = _Document.Descendants("User").Where(x => x.Element("Email").Value == email.ToLower() && x.Element("ApplicationId").Value == ApplicationName).FirstOrDefault();
+            if (xUser != null && RequiresUniqueEmail)
             {
                 status = MembershipCreateStatus.DuplicateEmail;
                 return null;
@@ -426,10 +367,8 @@ namespace Membership.Provider
         /// removes him/her from the internal cache.
         /// </summary>
         public override bool DeleteUser(string username, bool deleteAllRelatedData)
-        {
-            InitializeDataStore();
-
-            var user = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+        {            
+            var user = GetXlementUser(username);
 
             if (user != null)
             {
@@ -454,33 +393,14 @@ namespace Membership.Provider
         {
             InitializeDataStore();
 
-            var xUser = _Document.Descendants("User").Where(x => x.Element("Email").Value == email.ToLower()).FirstOrDefault();
+            var xUser = _Document.Descendants("User").Where(x => x.Element("Email").Value == email.ToLower()
+                && x.Element("ApplicationId").Value == ApplicationName).FirstOrDefault();
 
             if (xUser == null)
                 return string.Empty;
 
             string username = xUser.Element("UserName").Value;
             return username;
-        }
-
-
-        public MembershipUser MembershipUserFromXElement(XElement xUser)
-        {
-            MembershipUser user = new MembershipUser(this.Name,
-                   xUser.Descendants("UserName").FirstOrDefault().Value ?? "",
-                   xUser.Descendants("UserName").FirstOrDefault().Value ?? "",
-                   xUser.Descendants("Email").FirstOrDefault().Value ?? "",
-                   xUser.Descendants("PasswordQuestion").FirstOrDefault().Value ?? "",
-                   xUser.Descendants("Comment").FirstOrDefault().Value ?? "",
-                   Convert.ToBoolean(xUser.Descendants("IsApproved").FirstOrDefault().Value ?? "0"),
-                   Convert.ToBoolean(xUser.Descendants("IsLockedOut").FirstOrDefault().Value ?? "0"),
-                   Convert.ToDateTime(xUser.Descendants("CreateDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
-                   Convert.ToDateTime(xUser.Descendants("LastLoginDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
-                   Convert.ToDateTime(xUser.Descendants("LastActivityDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
-                   Convert.ToDateTime(xUser.Descendants("LastPasswordChangeDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
-                   Convert.ToDateTime(xUser.Descendants("LastLockoutDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()));
-
-            return user;
         }
 
 
@@ -505,9 +425,7 @@ namespace Membership.Provider
         /// </summary>
         public void UpdateUser(MembershipUser user, string password, string passwordQuestionAnswer)
         {
-            InitializeDataStore();
-
-            var xuser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == user.UserName.ToLower()).FirstOrDefault();
+            var xuser = GetXlementUser(user.UserName);
             if (xuser == null)
                 throw new NullReferenceException(string.Format("Cannot update user {0}. They don't exist in the data store.", user.UserName));
 
@@ -552,7 +470,8 @@ namespace Membership.Provider
             var onlineTime = now.Subtract(new TimeSpan(0, timewindow, 0));
 
             InitializeDataStore();
-            var nbrUsersOnline = _Document.Descendants("User").Where(x => Convert.ToDateTime(x.Element("LastActivityDate").Value) > onlineTime).Count();
+            var nbrUsersOnline = _Document.Descendants("User").Where(x => Convert.ToDateTime(x.Element("LastActivityDate").Value) > onlineTime
+                && x.Element("ApplicationId").Value == ApplicationName).Count();
             return nbrUsersOnline;
         }
 
@@ -568,8 +487,7 @@ namespace Membership.Provider
             if (!EnablePasswordReset)
                 throw new NotSupportedException("EnablePasswordReset is false.");
 
-            InitializeDataStore();
-            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+            var xUser = GetXlementUser(username);
 
             if (xUser == null)
                 throw new NullReferenceException(string.Format("The user {0} does not exists", username));
@@ -602,8 +520,7 @@ namespace Membership.Provider
             if (!EnablePasswordRetrieval)
                 throw new ProviderException("EnablePasswordRetrieval is false.");
 
-            InitializeDataStore();
-            var xUser = _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()).FirstOrDefault();
+            var xUser = GetXlementUser(username);                
 
             if (xUser == null)
                 throw new NullReferenceException(string.Format("The user {0} does not exists", username));
@@ -625,9 +542,112 @@ namespace Membership.Provider
             return UnEncodePassword(encodedPassword, salt);
         }
 
+        public override bool ChangePasswordQuestionAndAnswer(string username, string password, string newPasswordQuestion, string newPasswordAnswer)
+        {
+            if (!ValidateUser(username, password))
+                return false;
+
+            var xUser = GetXlementUser(username);
+
+            if(xUser == null)
+                return false;
+
+            xUser.Element("PasswordQuestion").Value = newPasswordQuestion;
+            xUser.Element("PasswordAnswer").Value = newPasswordQuestion;
+            _Document.Save(XmlFileName);
+            return true;
+        }
+
+        public override MembershipUserCollection FindUsersByEmail(string emailToMatch, int pageIndex, int pageSize, out int totalRecords)
+        {
+            InitializeDataStore();
+
+            string pattern = "^" + Regex.Escape(emailToMatch.ToLower()).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+            if (!pattern.Contains('*') && !pattern.Contains('.'))
+                pattern = pattern.Replace("$", ".*$");
+
+            Regex regex = new Regex(pattern);
+
+            MembershipUserCollection users = new MembershipUserCollection();
+            var xUsers = _Document.Descendants("User").Where(x => regex.IsMatch(x.Element("Email").Value, 0)
+                && x.Element("ApplicationId").Value == ApplicationName).OrderBy(x => x.Element("UserName").Value).Skip(pageIndex).Take(pageSize);
+            foreach (XElement xuser in xUsers)
+            {
+                var muser = XElementToMembershipUser(xuser);
+                users.Add(muser);
+            }
+
+            totalRecords = users.Count;
+            return users;
+        }
+
+        public override MembershipUserCollection FindUsersByName(string usernameToMatch, int pageIndex, int pageSize, out int totalRecords)
+        {
+            InitializeDataStore();
+            string pattern = "^" + Regex.Escape(usernameToMatch.ToLower()).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+            if (!pattern.Contains('*') && !pattern.Contains('.'))
+                pattern = pattern.Replace("$", ".*$");
+            
+            Regex regex = new Regex(pattern);
+
+            MembershipUserCollection users = new MembershipUserCollection();
+            var xUsers = _Document.Descendants("User").Where(x => regex.IsMatch(x.Element("UserName").Value, 0) 
+                && x.Element("ApplicationId").Value == ApplicationName).OrderBy(x => x.Element("UserName").Value).Skip(pageIndex).Take(pageSize);
+            foreach (XElement xuser in xUsers)
+            {
+                var muser = XElementToMembershipUser(xuser);
+                users.Add(muser);
+            }
+
+            totalRecords = users.Count;
+            return users;
+        }
+
+        public override bool UnlockUser(string userName)
+        {
+            return true;
+        }
+
         #endregion
 
         #region Helper methods
+
+        /// <summary>
+        /// Retrieves a user from the Datastore as an XElement
+        /// </summary>
+        /// <param name="username"></param>
+        /// <returns></returns>
+        private XElement GetXlementUser(string username)
+        {
+            InitializeDataStore();
+            return _Document.Descendants("User").Where(x => x.Element("UserName").Value == username.ToLower()
+                && x.Element("ApplicationId").Value == ApplicationName).FirstOrDefault();
+        }
+
+
+        /// <summary>
+        /// Converts a MembershipUser to an XElement
+        /// </summary>
+        /// <param name="xUser"></param>
+        /// <returns></returns>
+        private MembershipUser MembershipUserFromXElement(XElement xUser)
+        {
+            MembershipUser user = new MembershipUser(this.Name,
+                   xUser.Descendants("UserName").FirstOrDefault().Value ?? "",
+                   xUser.Descendants("UserName").FirstOrDefault().Value ?? "",
+                   xUser.Descendants("Email").FirstOrDefault().Value ?? "",
+                   xUser.Descendants("PasswordQuestion").FirstOrDefault().Value ?? "",
+                   xUser.Descendants("Comment").FirstOrDefault().Value ?? "",
+                   Convert.ToBoolean(xUser.Descendants("IsApproved").FirstOrDefault().Value ?? "0"),
+                   Convert.ToBoolean(xUser.Descendants("IsLockedOut").FirstOrDefault().Value ?? "0"),
+                   Convert.ToDateTime(xUser.Descendants("CreateDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
+                   Convert.ToDateTime(xUser.Descendants("LastLoginDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
+                   Convert.ToDateTime(xUser.Descendants("LastActivityDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
+                   Convert.ToDateTime(xUser.Descendants("LastPasswordChangeDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()),
+                   Convert.ToDateTime(xUser.Descendants("LastLockoutDate").FirstOrDefault().Value ?? DateTime.MinValue.ToString()));
+
+            return user;
+        }
 
         /// <summary>
         /// Convert an XElement to a membership user.
@@ -652,10 +672,9 @@ namespace Membership.Provider
         }
 
         /// <summary>
-        /// Builds the internal cache of users.
+        /// Loads the Xml Document into memory
         /// </summary>
-        /// 
-        private void ReadMembershipDataStore() { }
+        ///         
         private void InitializeDataStore()
         {
             lock (this)
@@ -667,6 +686,12 @@ namespace Membership.Provider
             }
         }
 
+        /// <summary>
+        /// Takes a configuration value and tests for null or empty. If it is returns the given default value.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="defaultValue"></param>
+        /// <returns></returns>
         private string GetConfigValue(string value, string defaultValue)
         {
             if (string.IsNullOrEmpty(value))
@@ -674,8 +699,27 @@ namespace Membership.Provider
             return value;
         }
 
-        private void InitConfigSettings(NameValueCollection config)
+        /// <summary>
+        /// Extract property configuration setting from the Web.Config
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="config"></param>
+        private void InitConfigSettings(string name, ref NameValueCollection config)
         {
+            if (config == null)
+                throw new ArgumentNullException("config");
+
+            if (String.IsNullOrEmpty(name))
+                name = "XmlMembershipProvider";
+
+            this.ProviderName = name;
+
+            if (string.IsNullOrEmpty(config["description"]))
+            {
+                config.Remove("description");
+                config.Add("description", "XML membership provider");
+            }
+
             ApplicationName = GetConfigValue(config["applicationName"], System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath);
             _maxInvalidPasswordAttempts = Convert.ToInt32(GetConfigValue(config["maxInvalidPasswordAttempts"], "5"));
             _passwordAttemptWindow = Convert.ToInt32(GetConfigValue(config["passwordAttemptWindow"], "10"));
@@ -688,6 +732,10 @@ namespace Membership.Provider
             _requiresUniqueEmail = Convert.ToBoolean(GetConfigValue(config["requiresUniqueEmail"], "true"));            
         }
 
+        /// <summary>
+        /// Initialize settings the pertain to password hashing / encrypting
+        /// </summary>
+        /// <param name="config"></param>
         private void InitPasswordEncryptionSettings(NameValueCollection config)
         {
             System.Configuration.Configuration cfg = WebConfigurationManager.OpenWebConfiguration(System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath);
@@ -726,7 +774,7 @@ namespace Membership.Provider
         }
 
         /// <summary>
-        /// Encode the password //Chris Pels
+        /// Encode the password
         /// </summary>
         /// <param name="password"></param>
         /// <param name="salt"></param>
@@ -755,7 +803,7 @@ namespace Membership.Provider
         }
 
         /// <summary>
-        /// UnEncode the password //Chris Pels
+        /// UnEncode the password 
         /// </summary>
         /// <param name="encodedPassword"></param>
         /// <param name="salt"></param>
@@ -793,6 +841,11 @@ namespace Membership.Provider
             }
         }
 
+        /// <summary>
+        /// Tests that a given password meets the minimum length and non alpha numeric contraints.
+        /// </summary>
+        /// <param name="password"></param>
+        /// <returns></returns>
         private bool PasswordMeetsMinimumRequirements(string password)
         {
             var nonAlphaNumericCharacters = password.Where(c => !char.IsLetterOrDigit(c)).SelectMany(x => x.ToString());
@@ -805,30 +858,5 @@ namespace Membership.Provider
 
 
         #endregion
-
-        #region Unsupported methods
-
-        public override bool UnlockUser(string userName)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override MembershipUserCollection FindUsersByEmail(string emailToMatch, int pageIndex, int pageSize, out int totalRecords)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override MembershipUserCollection FindUsersByName(string usernameToMatch, int pageIndex, int pageSize, out int totalRecords)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override bool ChangePasswordQuestionAndAnswer(string username, string password, string newPasswordQuestion, string newPasswordAnswer)
-        {
-            throw new NotSupportedException();
-        }
-
-        #endregion
-        
     }
 }

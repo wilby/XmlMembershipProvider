@@ -325,6 +325,52 @@ namespace Membership.Provider.Tests
             Assert.AreEqual(true, changed);
         }
 
+        [TestMethod]
+        public void ChangePasswordQuestionAndAnswe_returns_false_when_user_does_not_exist()
+        {
+            var changed = _provider.ChangePasswordQuestionAndAnswer(FakesData.BadUserName(), FakesData.GoodPassword(), FakesData.GoodPasswordQuestion(), FakesData.GoodPasswordQuestionAnswer());
+
+            Assert.AreEqual(false, changed);
+        }
+
+        [TestMethod]
+        public void ChangePasswordQuestionAndAnswe_returns_false_when__pass_is_wrong()
+        {
+            var changed = _provider.ChangePasswordQuestionAndAnswer(FakesData.GoodUserName(), FakesData.BadPassword(), FakesData.GoodPasswordQuestion(), FakesData.GoodPasswordQuestionAnswer());
+
+            Assert.AreEqual(false, changed);
+        }
+
+        [TestMethod]
+        public void ChangePasswordQuestionAndAnswe_returns_true_when_username_and_old_pass_are_correct()
+        {
+            var changed = _provider.ChangePasswordQuestionAndAnswer(FakesData.GoodUserName(), FakesData.GoodPassword(), FakesData.GoodPasswordQuestion(), FakesData.GoodPasswordQuestionAnswer());
+
+            Assert.AreEqual(true, changed);
+        }
+
+        [TestMethod]
+        public void FindUsersByName()
+        {
+            int totalRecord = 0;
+
+            var memUsers = _provider.FindUsersByName("w", 0, 10, out totalRecord);
+
+            Assert.AreEqual(1, totalRecord);
+            Assert.AreEqual(1, memUsers.Count);
+        }
+
+        [TestMethod]
+        public void FindUsersByEmail()
+        {
+            int totalRecord = 0;
+
+            var memUsers = _provider.FindUsersByName(FakesData.GoodEmail().Substring(0, 4), 0, 10, out totalRecord);
+
+            Assert.AreEqual(1, totalRecord);
+            Assert.AreEqual(1, memUsers.Count);
+        }
+
         //Helper Methods
 
         public static void AddTestUser()
@@ -414,7 +460,7 @@ namespace Membership.Provider.Tests
         {
             NameValueCollection config = new NameValueCollection();
             config.Add("name", "XmlMembershipProvider");
-            config.Add("applicationName", "TestApp");
+            config.Add("applicationName", "MyApp");
             config.Add("enablePasswordReset", "true");
             config.Add("enablePasswordRetrieval", "true");
             config.Add("maxInvalidPasswordAttempts", "5");
