@@ -4,7 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Membership.Provider
+namespace Wcjj.Providers
 {
     public static class PasswordUtil
     {

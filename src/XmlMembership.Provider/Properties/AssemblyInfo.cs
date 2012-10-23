@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Membership.Provider")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("Xml Membership Provider")]
+[assembly: AssemblyDescription("File Based Xml Membership Provider")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("Membership.Provider")]
+[assembly: AssemblyCompany("Wilby C. Jackson Jr.")]
+[assembly: AssemblyProduct("Xml Membership Provider")]
 [assembly: AssemblyCopyright("Copyright ©  2012")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

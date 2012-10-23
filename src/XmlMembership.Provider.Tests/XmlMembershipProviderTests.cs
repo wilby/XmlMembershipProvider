@@ -9,6 +9,7 @@ using System.Web.Configuration;
 using System.Text;
 using System.Web.Security;
 using System.IO;
+using Wcjj.Providers;
 
 namespace Membership.Provider.Tests
 {

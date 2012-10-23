@@ -17,7 +17,7 @@ using System.IO;
 using System.Web.Configuration;
 using System.Text.RegularExpressions;
 
-namespace Membership.Provider
+namespace Wcjj.Providers
 {
 
     public class XmlMembershipProvider : MembershipProvider
@@ -199,7 +199,7 @@ namespace Membership.Provider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("Membership.Provider.XmlMembershipProvider StackTrace: {0}", ex.StackTrace);
+                Debug.WriteLine("Wcjj.Providers.XmlMembershipProvider StackTrace: {0}", ex.StackTrace);
                 return false;
             }
         }
@@ -605,6 +605,9 @@ namespace Membership.Provider
 
         public override bool UnlockUser(string userName)
         {
+            var xUser = GetXlementUser(userName);
+            xUser.Element("IsLockedOut").Value = Convert.ToString(false);
+            _Document.Save(XmlFileName);
             return true;
         }
 
