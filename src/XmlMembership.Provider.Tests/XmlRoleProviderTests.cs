@@ -183,24 +183,14 @@ namespace Membership.Provider.Tests
         [ExpectedException(typeof(ProviderException))]
         public void DeleteRole_throws_provider_exception_user_is_in_role()
         {
-            var xUserRole = new XElement("UserRole",
-               new XElement("ApplicationId", "MyApp"),
-               new XElement("UserName", FakesData.GoodUserName()),
-               new XElement("RoleName", FakesData.GoodRole()));
-
-            _provider.XDocument.Descendants("UserRoles").FirstOrDefault().Add(xUserRole);
+            AddTestUserRole();            
             _provider.DeleteRole(FakesData.GoodRole(), true);
         }
 
         [TestMethod]        
         public void DeleteRole_does_not_throw_provider_exception__when_user_is_in_role_and_params_if_false()
         {
-            var xUserRole = new XElement("UserRole",
-              new XElement("ApplicationId", "MyApp"),
-              new XElement("UserName", FakesData.GoodUserName()),
-              new XElement("RoleName", FakesData.GoodRole()));
-
-            _provider.XDocument.Descendants("UserRoles").FirstOrDefault().Add(xUserRole);
+            AddTestUserRole();
             bool deleted = _provider.DeleteRole(FakesData.GoodRole(), false);
             Assert.IsTrue(deleted);
         }
@@ -217,6 +207,47 @@ namespace Membership.Provider.Tests
         public void DeleteRole_throws_argument_null_when_null_role()
         {
             _provider.DeleteRole(null, true);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ProviderException))]
+        public void FindUsersInRole_throws_exception_when_role_does_not_exist()
+        {
+            _provider.FindUsersInRole("NonRole", FakesData.GoodUserName());
+        }
+
+        [TestMethod]        
+        public void FindUsersInRole()
+        {
+            AddTestUserRole();
+            string[] usersInRole = _provider.FindUsersInRole(FakesData.GoodRole(), FakesData.GoodUserName());
+
+            Assert.AreEqual(1, usersInRole.Count());
+        }
+
+        [TestMethod]
+        public void GetAllRoles()
+        {
+            string[] roles = _provider.GetAllRoles();
+            Assert.AreEqual(3, roles.Count());
+        }
+
+        [TestMethod]
+        public void GetRolesForUser() {
+            AddTestUserRole();
+            var roles = _provider.GetRolesForUser(FakesData.GoodUserName());
+
+            Assert.AreEqual(1, roles.Count());
+        }
+
+        private void AddTestUserRole()
+        {
+            var xUserRole = new XElement("UserRole",
+              new XElement("ApplicationId", "MyApp"),
+              new XElement("UserName", FakesData.GoodUserName()),
+              new XElement("RoleName", FakesData.GoodRole()));
+
+            _provider.XDocument.Descendants("UserRoles").FirstOrDefault().Add(xUserRole);
         }
 
     }

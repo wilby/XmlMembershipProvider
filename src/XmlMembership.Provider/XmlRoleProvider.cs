@@ -164,7 +164,7 @@ namespace Wcjj.Providers
         
         public override void CreateRole(string roleName)
         {
-            ValidateRoleParameter(roleName);
+            ValidateParameter(roleName);
             
             var xRole = GetRole(roleName);
             if (xRole != null)
@@ -183,7 +183,7 @@ namespace Wcjj.Providers
         {
             InitializeDataStore();
 
-            ValidateRoleParameter(roleName);
+            ValidateParameter(roleName);
             var xUserRoles = _Document.Descendants("UserRole").Where(x => x.Element("RoleName").Value == roleName && x.Element("ApplicationId").Value == ApplicationName);
 
             if (xUserRoles.Count() > 0 && throwOnPopulatedRole)
@@ -205,17 +205,37 @@ namespace Wcjj.Providers
 
         public override string[] FindUsersInRole(string roleName, string usernameToMatch)
         {
-            throw new NotImplementedException();
+            var xRole = GetRole(roleName);
+            if (xRole == null)
+                throw new ProviderException(string.Format("The role {0} does not exist.", roleName));
+
+            var matchedUserNames = _Document.Descendants("UserRole").Where(x => x.Element("RoleName").Value == roleName &&
+                x.Element("UserName").IsMatch(usernameToMatch) && x.Element("ApplicationId").Value == ApplicationName).Select(y => y.Element("UserName").Value).OrderBy(z => z);
+
+            if (matchedUserNames.Count() > 0)
+                return matchedUserNames.ToArray<string>();
+
+            return new string[0];
         }
 
         public override string[] GetAllRoles()
         {
-            throw new NotImplementedException();
+            var roles = _Document.Descendants("Role").Where(x => x.Element("ApplicationId").Value == ApplicationName).Select(y => y.Element("RoleName").Value);
+            if (roles.Count() > 0)
+                return roles.ToArray<string>();
+            return new string[0];
         }
 
         public override string[] GetRolesForUser(string username)
         {
-            throw new NotImplementedException();
+            ValidateParameter(username);
+            var roles = _Document.Descendants("UserRole").Where(x => x.Element("ApplicationId").Value == ApplicationName
+                && x.Element("UserName").Value == username.ToLower()).Select(y => y.Element("RoleName").Value);
+
+            if (roles.Count() > 0)
+                return roles.ToArray<string>();
+
+            return new string[0];
         }
 
         public override string[] GetUsersInRole(string roleName)
@@ -248,13 +268,13 @@ namespace Wcjj.Providers
                 && x.Element("RoleName").Value == roleName).FirstOrDefault();
         }
 
-        private void ValidateRoleParameter(string roleName)
+        private void ValidateParameter(string roleName)
         {
             if (roleName == "")
-                throw new ArgumentException("The role cannot be an empty string.");
+                throw new ArgumentException("The parameter cannot be an empty string.");
 
             if (roleName == null)
-                throw new ArgumentNullException("The roleName cannot be null");
+                throw new ArgumentNullException("The parameter cannot be null");
         }
 
         private void InitializeDataStore()
