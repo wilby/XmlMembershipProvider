@@ -146,18 +146,42 @@ namespace Wcjj.Providers
             {
                 File.AppendAllText(XmlFileName, @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""no"" ?>
 <XmlProvider>
-  <Users>    
+  <Users> 
+    <!--
+    <User>
+      <ApplicationId>/</ApplicationId>
+      <UserName></UserName>
+      <PasswordSalt></PasswordSalt>
+      <Password></Password>
+      <Email></Email>
+      <PasswordQuestion></PasswordQuestion>
+      <PasswordAnswer></PasswordAnswer>
+      <IsApproved></IsApproved>
+      <IsLockedOut></IsLockedOut>
+      <CreateDate></CreateDate>
+      <LastLoginDate></LastLoginDate>
+      <LastActivityDate></LastActivityDate>
+      <LastPasswordChangeDate></LastPasswordChangeDate>
+      <LastLockoutDate></LastLockoutDate>
+      <FailedPasswordAttemptCount></FailedPasswordAttemptCount>
+      <FailedPasswordAnswerAttemptCount></FailedPasswordAnswerAttemptCount>
+      <Comment></Comment>
+    </User>
+    -->   
   </Users>
   <Roles>
-    <Role>
+    <!-- <Role>
       <ApplicationId>/</ApplicationId>
       <RoleName></RoleName>
       <Description></Description>
-    </Role>
+    </Role> -->
   </Roles>
   <UserRoles>
-    <UserName></UserName>
-    <RoleName></RoleName>
+    <!-- <UserRole>
+        <ApplicationId></ApplicationId>
+        <UserName></UserName>
+        <RoleName></RoleName>
+    <UserRole> -->
   </UserRoles>
 </XmlProvider>
 ");
@@ -561,15 +585,9 @@ namespace Wcjj.Providers
         public override MembershipUserCollection FindUsersByEmail(string emailToMatch, int pageIndex, int pageSize, out int totalRecords)
         {
             InitializeDataStore();
-
-            string pattern = "^" + Regex.Escape(emailToMatch.ToLower()).Replace("\\*", ".*").Replace("\\?", ".") + "$";
-            if (!pattern.Contains('*') && !pattern.Contains('.'))
-                pattern = pattern.Replace("$", ".*$");
-
-            Regex regex = new Regex(pattern);
-
+            
             MembershipUserCollection users = new MembershipUserCollection();
-            var xUsers = _Document.Descendants("User").Where(x => regex.IsMatch(x.Element("Email").Value, 0)
+            var xUsers = _Document.Descendants("User").Where(x => x.Element("Email").IsMatch(emailToMatch)
                 && x.Element("ApplicationId").Value == ApplicationName).OrderBy(x => x.Element("UserName").Value).Skip(pageIndex).Take(pageSize);
             foreach (XElement xuser in xUsers)
             {
@@ -584,14 +602,9 @@ namespace Wcjj.Providers
         public override MembershipUserCollection FindUsersByName(string usernameToMatch, int pageIndex, int pageSize, out int totalRecords)
         {
             InitializeDataStore();
-            string pattern = "^" + Regex.Escape(usernameToMatch.ToLower()).Replace("\\*", ".*").Replace("\\?", ".") + "$";
-            if (!pattern.Contains('*') && !pattern.Contains('.'))
-                pattern = pattern.Replace("$", ".*$");
-            
-            Regex regex = new Regex(pattern);
-
+           
             MembershipUserCollection users = new MembershipUserCollection();
-            var xUsers = _Document.Descendants("User").Where(x => regex.IsMatch(x.Element("UserName").Value, 0) 
+            var xUsers = _Document.Descendants("User").Where(x => x.Element("UserName").IsMatch(usernameToMatch) 
                 && x.Element("ApplicationId").Value == ApplicationName).OrderBy(x => x.Element("UserName").Value).Skip(pageIndex).Take(pageSize);
             foreach (XElement xuser in xUsers)
             {

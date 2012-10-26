@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Membership.Provider.Tests.Fake;
 using System.Xml.Linq;
 using System.Linq;
 using System.Configuration;
@@ -35,7 +34,7 @@ namespace Membership.Provider.Tests
         [TestInitialize]
         public void Initialize()
         {            
-            AddTestUser();
+            Helpers.AddTestUser(_xmlFileName, _hashAlgorithm, _validationKey);
 
             _provider = new XmlMembershipProvider();
             _provider.XmlFileName = _xmlFileName;
@@ -53,15 +52,18 @@ namespace Membership.Provider.Tests
     </Role>
   </Roles>
   <UserRoles>
-    <UserName></UserName>
-    <RoleName></RoleName>
+    <UserRole>
+        <ApplicationId></ApplicationId>
+        <UserName></UserName>
+        <RoleName></RoleName>
+    </UserRole>
   </UserRoles>
 </XmlProvider>
-");
+");         
+            Helpers.AddTestUser(_xmlFileName, _hashAlgorithm, _validationKey);
             _Document = XDocument.Load(_xmlFileName);
-            AddTestUser();
             _provider.XDocument = _Document;
-            _provider.Initialize("XmlMembershipProvider", CreateConfigFake());            
+            _provider.Initialize("XmlMembershipProvider", Helpers.CreateMembershipConfigFake());            
         }
 
         [ClassCleanup]
@@ -221,13 +223,13 @@ namespace Membership.Provider.Tests
 
             Assert.IsNull(xUser);
 
-            AddTestUser();
+            Helpers.AddTestUser(_xmlFileName, _hashAlgorithm, _validationKey);
         }
 
         [TestMethod]
         public void GetAllUsers()
         {
-            var xUser = GetGoodUser();
+            var xUser = Helpers.GetGoodUser(_hashAlgorithm, _validationKey);
             if(_provider.XDocument.Descendants("User").Count() == 0)
                 _provider.XDocument.Descendants("Users").FirstOrDefault().Add(xUser);
 
@@ -262,7 +264,7 @@ namespace Membership.Provider.Tests
             _provider = new XmlMembershipProvider();
             _provider.XmlFileName = "Membership.xml";
             _provider.XDocument = _Document;
-            var config = CreateConfigFake();
+            var config = Helpers.CreateMembershipConfigFake();
             config.Remove("enablePasswordReset");
             config.Add("enablePasswordReset", "false");
             _provider.Initialize("XmlMembershipProvider", config);
@@ -370,109 +372,6 @@ namespace Membership.Provider.Tests
 
             Assert.AreEqual(1, totalRecord);
             Assert.AreEqual(1, memUsers.Count);
-        }
-
-        //Helper Methods
-
-        public static void AddTestUser()
-        {
-            string password = FakesData.GoodPassword();
-            string passwordQuestionAnswer = FakesData.GoodPasswordQuestionAnswer();            
-            string salt = PasswordUtil.CreateRandomSalt();
-
-            _Document = XDocument.Load(_xmlFileName);
-            var user = _Document.Descendants("User").Where(x => x.Element("UserName").Value == FakesData.GoodUserName()).FirstOrDefault();
-            
-            if (user == null)
-            {
-                var xuser = new XElement("User",
-                    new XElement("ApplicationId", "MyApp"),
-                    new XElement("UserName", FakesData.GoodUserName()),
-                    new XElement("PasswordSalt", salt),
-                    new XElement("Password", PasswordUtil.HashPassword(password, salt, _hashAlgorithm, _validationKey)),
-                    new XElement("Email", FakesData.GoodEmail()),
-                    new XElement("PasswordQuestion", FakesData.GoodPasswordQuestion()),
-                    new XElement("PasswordAnswer", passwordQuestionAnswer),
-                    new XElement("IsApproved", Convert.ToString(true)),
-                    new XElement("IsLockedOut", Convert.ToString(false)),
-                    new XElement("CreateDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastLoginDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastActivityDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastPasswordChangeDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastLockoutDate", Convert.ToString(DateTime.Now)),
-                    new XElement("FailedPasswordAttemptCount", Convert.ToString(0)),
-                    new XElement("FailedPasswordAnswerAttemptCount", Convert.ToString(0)),
-                    new XElement("Comment", "")
-                    );
-
-
-                    var xusers = _Document.Descendants("Users").FirstOrDefault();
-                    xusers.AddFirst(xuser);
-                    _Document.Save(_xmlFileName);
-            }
-            
-        }
-
-        private static XElement GetGoodUser() {
-            string password = FakesData.GoodPassword();
-            string passwordQuestionAnswer = FakesData.GoodPasswordQuestionAnswer();            
-            string salt = PasswordUtil.CreateRandomSalt();
-            var xuser = new XElement("User",
-                    new XElement("ApplicationId", "MyApp"),
-                    new XElement("UserName", FakesData.GoodUserName()),
-                    new XElement("PasswordSalt", salt),
-                    new XElement("Password", PasswordUtil.HashPassword(password, salt, _hashAlgorithm, _validationKey)),
-                    new XElement("Email", FakesData.GoodEmail()),
-                    new XElement("PasswordQuestion", FakesData.GoodPasswordQuestion()),
-                    new XElement("PasswordAnswer", passwordQuestionAnswer),
-                    new XElement("IsApproved", Convert.ToString(true)),
-                    new XElement("IsLockedOut", Convert.ToString(false)),
-                    new XElement("CreateDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastLoginDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastActivityDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastPasswordChangeDate", Convert.ToString(DateTime.Now)),
-                    new XElement("LastLockoutDate", Convert.ToString(DateTime.Now)),
-                    new XElement("FailedPasswordAttemptCount", Convert.ToString(0)),
-                    new XElement("FailedPasswordAnswerAttemptCount", Convert.ToString(0)),
-                    new XElement("Comment", "")
-                    );
-
-            return xuser;
-        }
-
-        private static MembershipUser GetGoodUser(XElement user)
-        {
-            return new MembershipUser("",
-                user.Element("UserName").Value,
-                user.Element("UserName").Value,
-                user.Element("Email").Value,
-                user.Element("PasswordQuestion").Value ?? "",
-                user.Element("Comment").Value ?? "",
-                Convert.ToBoolean(user.Element("IsApproved").Value ?? "False"),
-                Convert.ToBoolean(user.Element("IsLockedOut").Value ?? "False"),
-                Convert.ToDateTime(user.Element("CreateDate").Value ?? DateTime.MinValue.ToLongDateString()),
-                Convert.ToDateTime(user.Element("LastLoginDate").Value ?? DateTime.MinValue.ToLongDateString()),
-                Convert.ToDateTime(user.Element("LastActivityDate").Value ?? DateTime.MinValue.ToLongDateString()),
-                Convert.ToDateTime(user.Element("LastPasswordChangeDate").Value ?? DateTime.MinValue.ToLongDateString()),
-                Convert.ToDateTime(user.Element("LastLockoutDate").Value ?? DateTime.MinValue.ToLongDateString()));
-        }
-
-        private static NameValueCollection CreateConfigFake()
-        {
-            NameValueCollection config = new NameValueCollection();
-            config.Add("name", "XmlMembershipProvider");
-            config.Add("applicationName", "MyApp");
-            config.Add("enablePasswordReset", "true");
-            config.Add("enablePasswordRetrieval", "true");
-            config.Add("maxInvalidPasswordAttempts", "5");
-            config.Add("minRequiredAlphaNumericCharacters", "2");
-            config.Add("minRequiredPasswordLength", "6");
-            config.Add("requiresQuestionAndAnswer", "true");
-            config.Add("requiresUniqueEmail", "true");
-            config.Add("passwordAttemptWindow", "10");
-            config.Add("passwordFormat", "Hashed");
-            //config.Add("connectionStringName", "Server");            
-            return config;
         }
     }
 }

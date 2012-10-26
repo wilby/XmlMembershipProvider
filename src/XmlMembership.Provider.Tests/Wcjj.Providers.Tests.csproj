@@ -55,7 +55,9 @@
     <Otherwise />
   </Choose>
   <ItemGroup>
-    <Compile Include="Fake\FakesData.cs" />
+    <Compile Include="FakesData.cs" />
+    <Compile Include="Helpers.cs" />
+    <Compile Include="XmlRoleProviderTests.cs" />
     <Compile Include="XmlMembershipProviderTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -73,6 +75,7 @@
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
+  <ItemGroup />
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
       <ItemGroup>
