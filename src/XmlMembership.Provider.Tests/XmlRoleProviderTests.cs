@@ -240,6 +240,77 @@ namespace Membership.Provider.Tests
             Assert.AreEqual(1, roles.Count());
         }
 
+        [TestMethod]
+        public void GetUsersInRole()
+        {
+            AddTestUserRole();
+            var userNames = _provider.GetUsersInRole(FakesData.GoodRole());
+
+            Assert.AreEqual(1, userNames.Count());
+        }
+
+        [TestMethod]
+        public void IsUserInRole_is_true()
+        {
+            AddTestUserRole();
+            var isInRole = _provider.IsUserInRole(FakesData.GoodUserName(), FakesData.GoodRole());
+
+            Assert.IsTrue(isInRole);
+        }
+
+        [TestMethod]
+        public void IsUserInRole_is_false()
+        {            
+            var isInRole = _provider.IsUserInRole(FakesData.GoodUserName(), FakesData.GoodRole());
+
+            Assert.IsFalse(isInRole);
+        }
+
+        [TestMethod]
+        public void RemoveUsersFromRoles()
+        {
+            AddTestUserRole();
+
+            var userNames = new string[1] { FakesData.GoodUserName() };
+            var roleNames = new string[1] { FakesData.GoodRole() };
+
+            var userRole = _provider.XDocument.Descendants("UserRole").Where(x => x.Element("UserName").Value == FakesData.GoodUserName()
+                && x.Element("RoleName").Value == FakesData.GoodRole());
+
+            Assert.AreEqual(1, userRole.Count());
+            _provider.RemoveUsersFromRoles(userNames, roleNames);
+            var userRoleAfter = _provider.XDocument.Descendants("UserRole").Where(x => x.Element("UserName").Value == FakesData.GoodUserName()
+                && x.Element("RoleName").Value == FakesData.GoodRole());
+            Assert.AreEqual(0, userRoleAfter.Count());
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ProviderException))]
+        public void RemoveUsersFromRoles_throws_exception_when_user_does_not_exist()
+        {
+            AddTestUserRole();
+
+            var userNames = new string[1] { FakesData.BadUserName() };
+            var roleNames = new string[1] { FakesData.GoodRole() };
+                       
+            _provider.RemoveUsersFromRoles(userNames, roleNames);
+            
+        }
+
+        [TestMethod]
+        public void RoleExists_true()
+        {
+            var exists = _provider.RoleExists(FakesData.GoodRole());
+            Assert.IsTrue(exists);
+        }
+
+        [TestMethod]
+        public void RoleExists_false()
+        {
+            var exists = _provider.RoleExists("NonRole");
+            Assert.IsFalse(exists);
+        }
+
         private void AddTestUserRole()
         {
             var xUserRole = new XElement("UserRole",

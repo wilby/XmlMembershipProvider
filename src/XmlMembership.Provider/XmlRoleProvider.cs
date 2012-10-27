@@ -220,6 +220,8 @@ namespace Wcjj.Providers
 
         public override string[] GetAllRoles()
         {
+            InitializeDataStore();
+
             var roles = _Document.Descendants("Role").Where(x => x.Element("ApplicationId").Value == ApplicationName).Select(y => y.Element("RoleName").Value);
             if (roles.Count() > 0)
                 return roles.ToArray<string>();
@@ -228,6 +230,8 @@ namespace Wcjj.Providers
 
         public override string[] GetRolesForUser(string username)
         {
+            InitializeDataStore();
+
             ValidateParameter(username);
             var roles = _Document.Descendants("UserRole").Where(x => x.Element("ApplicationId").Value == ApplicationName
                 && x.Element("UserName").Value == username.ToLower()).Select(y => y.Element("RoleName").Value);
@@ -240,22 +244,87 @@ namespace Wcjj.Providers
 
         public override string[] GetUsersInRole(string roleName)
         {
-            throw new NotImplementedException();
+            ValidateParameter(roleName);
+
+            var xRole = GetRole(roleName);
+            if (xRole == null)
+                throw new ProviderException(string.Format("The role {0} does not exist.", roleName));
+
+            var userNames = _Document.Descendants("UserRole").Where(x => x.Element("ApplicationId").Value == ApplicationName
+                && x.Element("RoleName").Value == roleName).Select( y => y.Element("UserName").Value);
+
+            if (userNames.Count() > 0)
+                return userNames.ToArray<string>();
+
+            return new string[0];
         }
 
         public override bool IsUserInRole(string username, string roleName)
         {
-            throw new NotImplementedException();
+            ValidateParameter(username);
+            ValidateParameter(roleName);
+
+            var xRole = GetRole(roleName);
+            if (xRole == null)
+                throw new ProviderException(string.Format("The role {0} does not exist.", roleName));
+
+            var xUser = GetRole(roleName);
+            if (xUser == null)
+                throw new ProviderException(string.Format("The user {0} does not exist.", username));
+
+            var xUserRole = _Document.Descendants("UserRole").Where(x =>
+                x.Element("ApplicationId").Value == ApplicationName
+                && x.Element("RoleName").Value == roleName
+                && x.Element("UserName").Value == username).FirstOrDefault();
+
+            if (xUserRole != null)
+                return true;
+            return false;
+
         }
 
         public override void RemoveUsersFromRoles(string[] usernames, string[] roleNames)
         {
-            throw new NotImplementedException();
+            InitializeDataStore();
+
+            foreach (var user in usernames)
+            {
+                ValidateParameter(user);
+            }
+            foreach (var role in roleNames)
+            {
+                ValidateParameter(role);
+            }
+            
+            var users = _Document.Descendants("User").Where(x => usernames.Contains(x.Element("UserName").Value) && x.Element("ApplicationId").Value == ApplicationName).Select(y => y.Element("UserName").Value);
+            var roles = _Document.Descendants("Role").Where(x => roleNames.Contains(x.Element("RoleName").Value) && x.Element("ApplicationId").Value == ApplicationName).Select(y => y.Element("RoleName").Value);
+
+            foreach (var user in usernames)
+            {
+                if (!users.Contains(user))
+                    throw new ProviderException(string.Format("The user {0} does not exist.", user));
+            }
+
+            foreach (var role in roleNames)
+            {
+                if(!roles.Contains(role))
+                    throw new ProviderException(string.Format("The role {0} does not exist.", role));
+            }
+
+            var xUserRole = _Document.Descendants("UserRole").Where(x =>
+               x.Element("ApplicationId").Value == ApplicationName
+               && roleNames.Contains(x.Element("RoleName").Value)
+               && usernames.Contains(x.Element("UserName").Value));
+
+            xUserRole.Remove();
         }
 
         public override bool RoleExists(string roleName)
         {
-            throw new NotImplementedException();
+            ValidateParameter(roleName);
+            var exists = _Document.Descendants("Role").Any(x => x.Element("ApplicationId").Value == ApplicationName
+                && x.Element("RoleName").Value == roleName);
+            return exists;
         }
 
         #region Helper Methods
